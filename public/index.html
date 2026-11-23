@@ -258,6 +258,13 @@ const rpj=n=>n>=1e6?'Rp'+(n/1e6).toLocaleString('id-ID',{maximumFractionDigits:1
 const num=n=>Math.round(n).toLocaleString('id-ID');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const store={get(k,d){try{return JSON.parse(localStorage.getItem('ics91_'+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem('ics91_'+k,JSON.stringify(v))}catch(e){}}};
+/* data bersama: dari database kalau sudah tersambung, kalau belum dari penyimpanan browser */
+const D={on:false,c:{},
+get(k,d){return this.on?(this.c[k]??d):store.get(k,d)},
+async kirim(method,body){const r=await fetch('/api/data',{method,headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Gagal menyimpan');return r.json()},
+async muat(){try{const r=await fetch('/api/data');if(!r.ok)return false;this.c=await r.json();this.on=true;return true}catch(e){return false}}};
+const gagal=e=>toast(e.message||'Gagal menyimpan');
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2000)};
 
 const I={
@@ -281,7 +288,7 @@ const VAR=['M','L','XL','XXL','Allsize'];const KUR=['J&T','SPX','JNE','SiCepat',
 let seed=91;const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;const pick=a=>a[Math.floor(rnd()*a.length)];
 const ORD=Array.from({length:42},(_,i)=>{const ch=pick(CHN),q=1+Math.floor(rnd()*3),pr=[59000,79000,89000,99000,129000][Math.floor(rnd()*5)];
 return{id:'2611'+(22000+i*37),t:`${String(8+Math.floor(i/5)).padStart(2,'0')}.${String((i*7)%60).padStart(2,'0')}`,ch,prod:pick(PROD)+' · '+pick(VAR),q,tot:pr*q,kur:pick(KUR),st:i%9===0?'Belum bayar':i%4===0?'Siap kirim':'Perlu dikirim',print:i%3===0}});
-const printed=store.get('printed',ORD.filter(o=>o.print).map(o=>o.id));ORD.forEach(o=>o.print=printed.includes(o.id));
+ORD.forEach(o=>o.print0=o.print);const printed=store.get('printed',ORD.filter(o=>o.print).map(o=>o.id));ORD.forEach(o=>o.print=printed.includes(o.id));
 const LOG0=[{w:'08.12',u:'Rina',n:48,p:'Printer meja 1'},{w:'09.40',u:'Dewi',n:36,p:'Printer meja 2'},{w:'10.05',u:'Sari',n:52,p:'Printer meja 1'}];
 const SD0={a:true,b:true,c:false,d:true,e:false};
 const T0=[{t:'Cek stok Gamis Rayon Bunga XL',d:false},{t:'Foto produk baru untuk campaign 12.12',d:false},{t:'Balas komplain pesanan 26112221',d:true}];
@@ -356,13 +363,13 @@ V['packing-daily']=()=>{const P=[['Rina',182],['Dewi',164],['Sari',201],['Lina',
 return head('Packing','Progres kemas per orang hari ini. Target 200 paket per orang.')+`<div class="stats" style="margin-bottom:16px">${stat('Sudah dikemas',num(tot),'<span class="up">+8%</span> dari kemarin')}${stat('Target hari ini','1.200')}${stat('Rata-rata per jam','112 paket')}${stat('Salah kirim','2','turun 1 dari kemarin')}</div>
 <div class="panel"><h2>Per orang</h2><p class="sub">Diurutkan dari yang paling banyak</p><div class="bars">${P.sort((a,b)=>b[1]-a[1]).map(p=>`<div class="r"><span>${p[0]}</span><div class="bar"><i style="width:${Math.min(100,p[1]/2)}%;background:${p[1]>=200?'var(--ok)':p[1]<120?'var(--warn)':'var(--nila)'}"></i></div><b>${p[1]} / 200</b></div>`).join('')}</div></div>`+SAMPLE};
 
-V['log-print']=()=>{const L=store.get('log',LOG0);
+V['log-print']=()=>{const L=D.get('log',LOG0);
 return head('Riwayat cetak','Semua label yang dicetak hari ini, terbaru di atas.')+table([['Waktu',''],['Petugas',''],['Jumlah label','n'],['Printer','']],L.slice().reverse().map(l=>`<tr><td class="mono">${l.w}</td><td>${esc(l.u)}</td><td class="n">${l.n}</td><td>${l.p}</td></tr>`),'stack')};
 
 V['dc-monitor']=()=>{const D=KUR.map((k,i)=>({k,tot:[312,268,140,96,54][i],ok:[280,190,140,60,54][i],jam:['14.00','15.30','13.00','16.00','12.30'][i]}));
 return head('Serah ke kurir','Jumlah paket yang sudah dijemput atau diantar ke drop point tiap kurir.')+`<div class="grid c3">${D.map(d=>{const p=d.ok/d.tot*100;return`<div class="panel"><div class="ph2"><h2>${d.k}</h2>${chip(p>=100?'Selesai':p>60?'Berjalan':'Tertinggal',p>=100?'ok':p>60?'nila':'bad')}</div><div class="res" style="font-size:34px">${d.ok}<span style="font-size:16px;color:var(--ink3);font-weight:600"> dari ${d.tot}</span></div><div class="bar mt"><i style="width:${p}%"></i></div><p class="note">Jemput terakhir ${d.jam}</p></div>`}).join('')}</div>`+SAMPLE};
 
-V['sdcase']=()=>{const S=store.get('sd',SD0);const items=[['a','Terima pembatalan sebelum label dicetak','Pesanan yang belum dicetak langsung dibatalkan saat pembeli minta.'],['b','Tahan pesanan dengan alamat tidak lengkap','Pesanan masuk antrean cek manual sebelum dicetak.'],['c','Setujui retur di bawah Rp50.000','Retur kecil disetujui tanpa cek gudang.'],['d','Tandai pembeli yang sering retur','Lebih dari 2 retur dalam 30 hari.'],['e','Kirim di hari yang sama untuk Solo Raya','Hanya lewat kurir instan.']];
+V['sdcase']=()=>{const S=D.get('sd',SD0);const items=[['a','Terima pembatalan sebelum label dicetak','Pesanan yang belum dicetak langsung dibatalkan saat pembeli minta.'],['b','Tahan pesanan dengan alamat tidak lengkap','Pesanan masuk antrean cek manual sebelum dicetak.'],['c','Setujui retur di bawah Rp50.000','Retur kecil disetujui tanpa cek gudang.'],['d','Tandai pembeli yang sering retur','Lebih dari 2 retur dalam 30 hari.'],['e','Kirim di hari yang sama untuk Solo Raya','Hanya lewat kurir instan.']];
 return head('Aturan otomatis','Atur apa yang dilakukan sistem saat ada pembatalan, retur, atau kasus khusus.')+`<div class="panel" style="max-width:820px"><div class="list">${items.map(i=>`<div class="row"><div class="t"><b>${i[1]}</b><small>${i[2]}</small></div><button class="sw ${S[i[0]]?'on':''}" data-sw="${i[0]}" role="switch" aria-checked="${!!S[i[0]]}" aria-label="${i[1]}"></button></div>`).join('')}</div></div>`};
 
 V['beban-ops']=()=>{const B=[['Gaji harian',2400000],['Plastik dan lakban',640000],['Kertas label',380000],['Listrik gudang',210000],['Konsumsi',180000],['Ongkir retur',150000]];const t=B.reduce((a,b)=>a+b[1],0),mx=Math.max(...B.map(b=>b[1]));
@@ -372,7 +379,7 @@ return head('Biaya operasional','Pengeluaran gudang hari ini.')+`<div class="sta
 V['wh-report']=()=>head('Laporan gudang','Barang masuk dan keluar dalam 7 hari terakhir.')+`<div class="stats" style="margin-bottom:16px">${stat('Keluar hari ini','904 pcs','<span class="up">+3%</span>')}${stat('Masuk hari ini','540 pcs','<span class="dn">-13%</span>')}${stat('Total stok','12.480 pcs')}${stat('Retur diterima','14 pcs')}</div>
 <div class="panel"><h2>Masuk dan keluar per hari</h2><p class="sub"><span class="chl"><i style="background:var(--nila)"></i>Keluar</span> &nbsp; <span class="chl"><i style="background:var(--mulberry)"></i>Masuk</span></p><div class="fig"><svg id="whchart"></svg></div></div>`+SAMPLE;
 
-V['task']=()=>{const T=store.get('task',T0);const open=T.filter(x=>!x.d).length;
+V['task']=()=>{const T=D.get('task',T0);const open=T.filter(x=>!x.d).length;
 return head('Tugas',open?`${open} tugas belum selesai.`:'Semua tugas selesai.')+`<div class="panel" style="max-width:820px"><form id="tf" class="toolbar"><input class="field" id="tin" placeholder="Tulis tugas baru" aria-label="Tugas baru"><button class="btn pri">Tambah tugas</button></form><div class="list">${T.map((x,i)=>`<div class="row"><input type="checkbox" class="chk" data-t="${i}" ${x.d?'checked':''} aria-label="Tandai selesai"><div class="t" style="${x.d?'text-decoration:line-through;color:var(--ink3)':''}">${esc(x.t)}</div><button class="btn sm" data-del="${i}">Hapus</button></div>`).join('')||'<p class="empty">Belum ada tugas. Tulis tugas pertama di atas.</p>'}</div></div>`};
 
 const RACK=Array.from({length:24},(_,i)=>({r:'ABCD'[Math.floor(i/6)]+(i%6+1),p:PROD[i%PROD.length],q:(i*37+11)%120}));
@@ -390,7 +397,7 @@ return head('Jatuh tempo','Voucher, promo, akses toko, dan kontrak yang akan ber
 V['restock']=()=>{const R=PROD.map((p,i)=>{const s=[8,42,15,60,5,22,11,90][i],j=[6,4,3,2,5,2,2,1][i],d=Math.floor(s/j);return{p,s,j,d,sug:Math.max(0,j*21-s)}}).sort((a,b)=>a.d-b.d);
 return head('Restock','Saran jumlah order ulang agar stok cukup untuk 21 hari, berdasarkan rata-rata penjualan harian.')+table([['Produk',''],['Stok','n'],['Terjual per hari','n'],['Cukup untuk','n'],['Saran order','n'],['Prioritas','']],R.map(r=>`<tr><td><b>${r.p}</b></td><td class="n">${r.s}</td><td class="n">${r.j}</td><td class="n">${r.d} hari</td><td class="n"><b>${r.sug} pcs</b></td><td>${chip(r.d<=3?'Segera':r.d<=10?'Minggu ini':'Aman',r.d<=3?'bad':r.d<=10?'warn':'ok')}</td></tr>`),'stack')+SAMPLE};
 
-V['masalah-produk']=()=>{const M=store.get('mp',MP0);
+V['masalah-produk']=()=>{const M=D.get('mp',MP0);
 return head('Masalah produk','Catat barang cacat, salah kirim, dan komplain pembeli.')+`<div class="panel" style="margin-bottom:16px"><h2>Laporkan masalah</h2><p class="sub">Laporan baru masuk dengan status Baru</p><form id="mf" class="toolbar" style="margin:0"><select class="field" id="mp1" aria-label="Produk" style="flex:1;min-width:180px">${PROD.map(p=>`<option>${p}</option>`).join('')}</select><input class="field" id="mp2" placeholder="Apa masalahnya?" aria-label="Masalah" style="flex:2;min-width:200px"><select class="field" id="mp3" aria-label="Channel">${CHN.map(c=>`<option>${c}</option>`).join('')}</select><button class="btn pri">Kirim laporan</button></form></div>`+
 table([['Produk',''],['Masalah',''],['Channel',''],['Status','']],M.slice().reverse().map(m=>`<tr><td><b>${esc(m.p)}</b></td><td>${esc(m.m)}</td><td>${chl(m.c)}</td><td>${chip(m.s,m.s==='Selesai'?'ok':m.s==='Diproses'?'warn':'mul')}</td></tr>`),'stack')};
 
@@ -416,17 +423,32 @@ function bind(id){
   if(id==='print-daily'){
     $('#pf').oninput=e=>{store.set('pf',e.target.value);const pos=e.target.selectionStart;render();const n=$('#pf');n.focus();n.setSelectionRange(pos,pos)};
     $('#selall').onclick=()=>$$('[data-id]').forEach(c=>c.checked=true);
-    $('#doprint').onclick=()=>{const ids=$$('[data-id]:checked').map(c=>c.dataset.id);if(!ids.length)return toast('Centang pesanan yang mau dicetak dulu');
-      ORD.forEach(o=>{if(ids.includes(o.id))o.print=true});store.set('printed',ORD.filter(o=>o.print).map(o=>o.id));
-      const L=store.get('log',LOG0);L.push({w:new Date().toTimeString().slice(0,5).replace(':','.'),u:window.__first||'Admin',n:ids.length,p:'Printer meja 1'});store.set('log',L);toast(ids.length+' label dicetak');drawMenu();render()}}
-  if(id==='sdcase')$$('[data-sw]').forEach(b=>b.onclick=()=>{const S=store.get('sd',SD0);S[b.dataset.sw]=!S[b.dataset.sw];store.set('sd',S);b.classList.toggle('on');b.setAttribute('aria-checked',S[b.dataset.sw]);toast(S[b.dataset.sw]?'Aturan dinyalakan':'Aturan dimatikan')});
-  if(id==='task'){const T=()=>store.get('task',T0);
-    $('#tf').onsubmit=e=>{e.preventDefault();const v=$('#tin').value.trim();if(!v)return;const t=T();t.unshift({t:v,d:false});store.set('task',t);render();$('#tin').focus()};
-    $$('[data-t]').forEach(c=>c.onchange=()=>{const t=T();t[c.dataset.t].d=c.checked;store.set('task',t);render()});
-    $$('[data-del]').forEach(b=>b.onclick=()=>{const t=T();t.splice(b.dataset.del,1);store.set('task',t);render();toast('Tugas dihapus')})}
+    $('#doprint').onclick=async()=>{const ids=$$('[data-id]:checked').map(c=>c.dataset.id);if(!ids.length)return toast('Centang pesanan yang mau dicetak dulu');
+      const printer='Printer meja 1';
+      if(D.on){try{D.c.log.push(await D.kirim('POST',{jenis:'cetak',nomor_pesanan:ids,printer}))}catch(e){return gagal(e)}}
+      else{const L=store.get('log',LOG0);L.push({w:new Date().toTimeString().slice(0,5).replace(':','.'),u:window.__first||'Admin',n:ids.length,p:printer});store.set('log',L)}
+      ORD.forEach(o=>{if(ids.includes(o.id))o.print=true});if(!D.on)store.set('printed',ORD.filter(o=>o.print).map(o=>o.id));
+      toast(ids.length+' label dicetak');drawMenu();render()}}
+  if(id==='sdcase')$$('[data-sw]').forEach(b=>b.onclick=async()=>{const k=b.dataset.sw,S={...D.get('sd',SD0)};S[k]=!S[k];
+    if(D.on){b.disabled=true;try{D.c.sd=await D.kirim('PUT',{jenis:'aturan',nilai:S})}catch(e){return gagal(e)}finally{b.disabled=false}}else store.set('sd',S);
+    b.classList.toggle('on',S[k]);b.setAttribute('aria-checked',S[k]);toast(S[k]?'Aturan dinyalakan':'Aturan dimatikan')});
+  if(id==='task'){const T=()=>D.get('task',T0);
+    $('#tf').onsubmit=async e=>{e.preventDefault();const v=$('#tin').value.trim();if(!v)return;
+      if(D.on){try{D.c.task.unshift(await D.kirim('POST',{jenis:'tugas',judul:v}))}catch(e){return gagal(e)}}else{const t=T();t.unshift({t:v,d:false});store.set('task',t)}
+      render();$('#tin').focus()};
+    $$('[data-t]').forEach(c=>c.onchange=async()=>{const t=T(),x=t[c.dataset.t];
+      if(D.on){try{Object.assign(x,await D.kirim('PATCH',{jenis:'tugas',id:x.id,selesai:c.checked}))}catch(e){c.checked=!c.checked;return gagal(e)}}else{x.d=c.checked;store.set('task',t)}
+      render()});
+    $$('[data-del]').forEach(b=>b.onclick=async()=>{const t=T(),i=+b.dataset.del;
+      if(D.on){try{await D.kirim('DELETE',{jenis:'tugas',id:t[i].id})}catch(e){return gagal(e)}}
+      t.splice(i,1);if(!D.on)store.set('task',t);render();toast('Tugas dihapus')})}
   if(id==='rak-produk'){$$('[data-cell]').forEach(b=>b.onclick=()=>{const[r,p,q]=b.dataset.cell.split('|');$('#rinfo').textContent=`Rak ${r} berisi ${p}, sisa ${q} pcs.`});
     $('#rf').oninput=e=>{const v=e.target.value.toLowerCase();$$('[data-cell]').forEach(b=>b.style.opacity=!v||b.dataset.cell.toLowerCase().includes(v)?1:.25)}}
-  if(id==='masalah-produk')$('#mf').onsubmit=e=>{e.preventDefault();const m=$('#mp2').value.trim();if(!m)return toast('Tulis masalahnya dulu');const M=store.get('mp',MP0);M.push({p:$('#mp1').value,m,c:$('#mp3').value,s:'Baru'});store.set('mp',M);toast('Laporan terkirim');render()};
+  if(id==='masalah-produk')$('#mf').onsubmit=async e=>{e.preventDefault();const m=$('#mp2').value.trim();if(!m)return toast('Tulis masalahnya dulu');
+    const L={p:$('#mp1').value,m,c:$('#mp3').value};
+    if(D.on){try{D.c.mp.push(await D.kirim('POST',{jenis:'masalah',produk:L.p,masalah:m,channel:L.c}))}catch(e){return gagal(e)}}
+    else{const M=store.get('mp',MP0);M.push({...L,s:'Baru'});store.set('mp',M)}
+    toast('Laporan terkirim');render()};
   if(id==='kalkulator-impor'){const calc=()=>{const v=k=>+$('#k'+k).value||0;const barang=v(1)*v(2)*v(3),cif=barang+v(4),bea=cif*v(5)/100,ppn=(cif+bea)*v(6)/100,pph=(cif+bea)*v(7)/100,tot=cif+bea+ppn+pph,per=v(3)?tot/v(3):0,laba=v(8)-per,mg=v(8)?Math.round(laba/v(8)*100):0;
     $('#kr').textContent=rp(per);$('#kl').innerHTML=`<span style="color:${laba>=0?'var(--ok)':'var(--bad)'}">Laba ${rp(laba)} per pcs, margin ${mg}%</span>`;
     $('#kd').innerHTML=[['Harga barang',barang],['Ongkir dan jasa',v(4)],['Bea masuk',bea],['PPN',ppn],['PPh',pph],['Total modal',tot]].map(x=>`<div>${x[0]}<b>${rp(x[1])}</b></div>`).join('')};
@@ -474,6 +496,7 @@ window.addEventListener('scroll',()=>$('#top').classList.toggle('scrolled',scrol
 window.addEventListener('hashchange',()=>{render();scrollTo(0,0)});
 
 drawMenu();render();
+D.muat().then(ok=>{if(!ok)return;ORD.forEach(o=>o.print=o.print0||D.c.printed.includes(o.id));drawMenu();render()});
 fetch('/api/auth/me').then(r=>r.ok?r.json():null).then(u=>{if(!u)return;
   const first=(u.name||u.email.split('@')[0]).split(' ')[0];window.__first=first;
   $('#uname').textContent=first;$('#mname').textContent=u.name||first;$('#memail').textContent=u.email;
