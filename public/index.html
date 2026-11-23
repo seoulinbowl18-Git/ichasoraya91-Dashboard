@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -241,7 +241,7 @@ table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding-bl
       <div class="sync"><i class="pulse"></i><span id="synctxt">Tersinkron</span></div>
       <div class="me">
         <button class="mebtn" id="mebtn" aria-haspopup="true" aria-expanded="false"><span class="av" id="uav">i</span><b id="uname">Akun</b></button>
-        <div class="menu" id="memenu"><div class="who"><b id="mname">Memuat akun</b><span id="memail"></span></div><button id="theme">Ganti tema terang atau gelap</button><a href="/api/auth/logout">Keluar</a></div>
+        <div class="menu" id="memenu"><div class="who"><b id="mname">Memuat akun</b><span id="memail"></span></div><button id="theme">Ganti ke tema gelap</button><a href="/api/auth/logout">Keluar</a></div>
       </div>
     </header>
     <main id="app"></main>
@@ -463,9 +463,9 @@ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLower
 const mb=$('#mebtn'),mm=$('#memenu');
 mb.onclick=e=>{e.stopPropagation();const o=mm.classList.toggle('open');mb.setAttribute('aria-expanded',o)};
 document.addEventListener('click',e=>{if(!e.target.closest('.me'))mm.classList.remove('open')});
-const applyTheme=t=>{if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme};
-applyTheme(store.get('theme',''));
-$('#theme').onclick=()=>{const dark=matchMedia('(prefers-color-scheme: dark)').matches;const cur=document.documentElement.dataset.theme||(dark?'dark':'light');const nx=cur==='dark'?'light':'dark';applyTheme(nx);store.set('theme',nx);render()};
+const applyTheme=t=>{document.documentElement.dataset.theme=t||'light';const b=document.getElementById('theme');if(b)b.textContent=t==='dark'?'Ganti ke tema terang':'Ganti ke tema gelap'};
+applyTheme(store.get('theme','light'));
+$('#theme').onclick=()=>{const cur=document.documentElement.dataset.theme||'light';const nx=cur==='dark'?'light':'dark';applyTheme(nx);store.set('theme',nx);render()};
 if(store.get('slim',false))document.body.classList.add('slim');
 $('#slim').onclick=()=>{const s=document.body.classList.toggle('slim');store.set('slim',s);$('#slim').setAttribute('aria-label',s?'Lebarkan menu':'Ciutkan menu')};
 $('#burger').onclick=()=>document.body.classList.toggle('nav');
