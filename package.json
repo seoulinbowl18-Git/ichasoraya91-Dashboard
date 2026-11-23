@@ -1,0 +1,6 @@
+{
+  "name": "ichasoraya91",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" }
+}
