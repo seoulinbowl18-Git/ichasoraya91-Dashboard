@@ -4,7 +4,7 @@ Dashboard ERP internal toko multi-channel (TikTok Shop, Shopee, Lazada).
 
 ## Struktur
 
-- `public/index.html`: dashboard (Ringkasan dan 16 menu operasional), saat ini masih data contoh
+- `public/index.html`: dashboard bertema hijau (Ringkasan berisi kartu pesanan per status dan grafik, plus 16 menu operasional), saat ini masih data contoh
 - `public/login.html`: halaman masuk dengan Google
 - `middleware.js`: semua halaman wajib login
 - `api/auth/*`: login, callback, me, logout dengan Google OAuth
